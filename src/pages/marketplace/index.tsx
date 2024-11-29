@@ -81,9 +81,11 @@ export default function Marketplace() {
       // Membuat draft transaksi
       const txBuild = new MeshTxBuilder({
         fetcher: nodeProvider,
-        submitter: nodeProvider,
+        evaluator: nodeProvider,
+        verbose: true,
       });
       const txDraft = await txBuild
+        .setNetwork("preprod")
         .txOut(contractAddress, assets)
         .txOutDatumHashValue(mConStr0([signerHash]))
         .changeAddress(walletAddress)

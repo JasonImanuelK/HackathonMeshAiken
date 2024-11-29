@@ -84,9 +84,11 @@ export default function Merchant() {
       // Membuat draft transaksi
       const txBuild = new MeshTxBuilder({
         fetcher: nodeProvider,
-        submitter: nodeProvider,
+        evaluator: nodeProvider,
+        verbose: true,
       });
       const txDraft = await txBuild
+        .setNetwork("preprod")
         .spendingPlutusScript("V3")
         .txIn(txHash, index, amount, address)
         .txInScript(scriptCbor)
