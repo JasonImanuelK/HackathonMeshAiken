@@ -5,16 +5,23 @@ import {
   BlockfrostProvider,
   UTxO,
   deserializeAddress,
+  deserializeDatum,
   serializePlutusScript,
   mConStr0,
+  ConStr0,
   stringToHex,
   MeshTxBuilder,
   Asset,
+  BuiltinByteString,
 } from "@meshsdk/core";
 import { applyParamsToScript } from "@meshsdk/core-csl";
 
 // Integrasi smart-contract
 import contractBlueprint from "../../../aiken-workspace/plutus.json";
+
+export type MarketDatum = ConStr0<
+  [String, String, String]
+>;
 
 // Mendapatkan validator script dalam format CBOR
 const scriptCbor = applyParamsToScript(
@@ -41,6 +48,9 @@ const refNumber = "17925";
 // Jeda 10 detik setelah berhasil transaksi
 const timeout = 30000;
 
+const merchantAddress = process.env.NEXT_PUBLIC_SELLER_ADDRESS || "";
+const signerHash = deserializeAddress(merchantAddress).pubKeyHash;
+
 export default function Merchant() {
   const { connected, wallet } = useWallet();
   const [loading, setLoading] = useState(true);
@@ -57,7 +67,25 @@ export default function Merchant() {
   // Fungsi untuk mendapatkan list UTxO dari contract address
   async function getUtxosListContractAddr() {
     const utxos: UTxO[] = await nodeProvider.fetchAddressUTxOs(contractAddress);
-    setUtxoList(utxos);
+    
+    const newUtxos: UTxO[] = [];
+    console.log("UTxOs:", utxos);
+    utxos.forEach((utxo) => {
+      console.log("UTxO:", utxo);
+      if (utxo.output.plutusData !== undefined) {
+        const datum = deserializeDatum<MarketDatum>(utxo.output.plutusData!);
+        console.log("Datum INSIDE :",datum)
+        newUtxos.push(utxo);
+        // if (datum.fields[0] === signerHash) {
+        //   newUtxos.push(utxo);
+        // }
+      } else {
+        console.log("plutusData is undefined");
+        newUtxos.push(utxo);
+      } 
+    });
+
+    setUtxoList(newUtxos);
   }
 
   // Fungsi membaca informasi wallet

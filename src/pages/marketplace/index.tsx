@@ -11,6 +11,7 @@ import {
   mConStr0,
   MeshTxBuilder,
   Asset,
+  Data
 } from "@meshsdk/core";
 import { applyParamsToScript } from "@meshsdk/core-csl";
 
@@ -78,6 +79,8 @@ export default function Marketplace() {
       // Mendapatkan wallet address dan index utxo
       const { walletAddress, utxos } = await getWalletInfo();
 
+      const buyerHash = deserializeAddress(walletAddress).pubKeyHash;
+
       // Membuat draft transaksi
       const txBuild = new MeshTxBuilder({
         fetcher: nodeProvider,
@@ -87,7 +90,8 @@ export default function Marketplace() {
       const txDraft = await txBuild
         .setNetwork("preprod")
         .txOut(contractAddress, assets)
-        .txOutDatumHashValue(mConStr0([signerHash]))
+        .txOutDatumHashValue(mConStr0([signerHash,buyerHash,'Done']))
+        .txOutInlineDatumValue(mConStr0([signerHash,buyerHash,'Done']))
         .changeAddress(walletAddress)
         .selectUtxosFrom(utxos)
         .complete();
