@@ -1,3 +1,3 @@
-# Starter Next.js TypeScript
+# Hackathon Web3 DApps on Cardano Server
 
-Start a new project on Next.js. This starter template consists of a connect wallet button and wallet integration.
+This is a project about a Marketplace DApps that runs on Cardano Server using MeshJS as the connector to the blockchain server and Aiken as the smart contract.
