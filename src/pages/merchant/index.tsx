@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect } from "react";
-import { CardanoWallet, useWallet } from "@meshsdk/react";
+import { useWallet } from "@meshsdk/react";
 import {
   BlockfrostProvider,
   UTxO,
@@ -12,15 +12,18 @@ import {
   stringToHex,
   MeshTxBuilder,
   Asset,
-  BuiltinByteString,
+  PubKeyHash,
+  Integer,
 } from "@meshsdk/core";
 import { applyParamsToScript } from "@meshsdk/core-csl";
+import { useRouter } from "next/router";
+import { checkSession } from "../api/authService";
 
 // Integrasi smart-contract
 import contractBlueprint from "../../../aiken-workspace/plutus.json";
 
 export type MarketDatum = ConStr0<
-  [String, String, String]
+  [PubKeyHash, PubKeyHash, Integer]
 >;
 
 // Mendapatkan validator script dalam format CBOR
@@ -52,33 +55,47 @@ const merchantAddress = process.env.NEXT_PUBLIC_SELLER_ADDRESS || "";
 const signerHash = deserializeAddress(merchantAddress).pubKeyHash;
 
 export default function Merchant() {
+  const router = useRouter();
   const { connected, wallet } = useWallet();
   const [loading, setLoading] = useState(true);
   const [utxoList, setUtxoList] = useState<UTxO[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Ketika terdeksi perubahan parameter connected yang bernilai false menjadi true maka fungsi getUtxosListContractAddr() dieksekusi
   useEffect(() => {
     setUtxoList([]);
+    handler();
     if (connected) {
       getUtxosListContractAddr();
     }
   }, [connected]);
+
+  async function handler(){
+    try{      
+      const checkResult = await checkSession(3);
+      if (checkResult) {
+        setIsLoading(false)
+      } else {
+        router.push("/")
+      }
+    } catch {
+      router.push("/")
+    }
+  }
 
   // Fungsi untuk mendapatkan list UTxO dari contract address
   async function getUtxosListContractAddr() {
     const utxos: UTxO[] = await nodeProvider.fetchAddressUTxOs(contractAddress);
     
     const newUtxos: UTxO[] = [];
-    console.log("UTxOs:", utxos);
-    utxos.forEach((utxo) => {
+    utxos.slice(2).forEach((utxo) => {
       console.log("UTxO:", utxo);
       if (utxo.output.plutusData !== undefined) {
         const datum = deserializeDatum<MarketDatum>(utxo.output.plutusData!);
         console.log("Datum INSIDE :",datum)
-        newUtxos.push(utxo);
-        // if (datum.fields[0] === signerHash) {
-        //   newUtxos.push(utxo);
-        // }
+        if (datum.fields[0].bytes === signerHash) {
+          newUtxos.push(utxo);
+        }
       } else {
         console.log("plutusData is undefined");
         newUtxos.push(utxo);
@@ -105,9 +122,6 @@ export default function Merchant() {
     try {
       // Mendapatkan alamat wallet, list utxo, dan kolateral dari wallet address penerima dana
       const { walletAddress, utxos, collateral } = await getWalletInfo();
-
-      // Mendapatkan pubKeyHash sebagai bukti (datum) bahwa wallet address ini berhak menerima dana
-      const signerHash = deserializeAddress(walletAddress).pubKeyHash;
 
       // Membuat draft transaksi
       const txBuild = new MeshTxBuilder({
@@ -161,12 +175,15 @@ export default function Merchant() {
     }
   }
 
+  if (isLoading) {
+    return <h1 className="flex justify-center items-center h-screen text-2xl">Checking session...</h1>;
+  }
+
   return (
     <div className="flex-col justify-center items-center">
       {/* NAVBAR */}
       <div className="bg-gray-900 flex justify-between items-center p-6 border-b border-white text-white mb-24">
         <h1 className="text-4xl font-bold">MERCHANT PAYOUT</h1>
-        <CardanoWallet />
       </div>
 
       {/* TABLE */}
@@ -181,7 +198,7 @@ export default function Merchant() {
           {utxoList.length > 0 && loading && (
             <table className="table-auto border-collapse border border-gray-300 w-3/4">
               <thead>
-                <tr className="bg-gray-100">
+                <tr className="bg-gray-100 text-black">
                   <th className="border border-gray-300 px-4 py-2">
                     Transaction-ID
                   </th>

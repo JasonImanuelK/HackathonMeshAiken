@@ -12,11 +12,13 @@
   "dependencies": {
     "@meshsdk/core": "^1.7.18",
     "@meshsdk/react": "^1.7.18",
+    "jsonwebtoken": "^9.0.2",
     "next": "^15.0.3",
     "react": "^18",
     "react-dom": "^18"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22",
     "@types/react": "^18",
     "@types/react-dom": "^18",
