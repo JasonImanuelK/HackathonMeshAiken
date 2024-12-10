@@ -1,9 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-
-// Dependencies / modules yang digunakan
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
-import { CardanoWallet, useWallet } from "@meshsdk/react";
+import { useWallet } from "@meshsdk/react";
 import {
   BlockfrostProvider,
   deserializeAddress,
@@ -14,6 +12,8 @@ import {
   Data
 } from "@meshsdk/core";
 import { applyParamsToScript } from "@meshsdk/core-csl";
+import { useRouter } from "next/router";
+import { checkSession } from "../api/authService";
 
 // Integrasi smart-contract
 import contractBlueprint from "../../../aiken-workspace/plutus.json";
@@ -47,11 +47,29 @@ const platformFee = 1;
 const deliveryFee = 3;
 
 export default function Marketplace() {
-  // Initial states
+  const router = useRouter();
   const { connected, wallet } = useWallet();
   const [view, setView] = useState(1);
   const [quantity, setQuantity] = useState(1);
   const [totalPrice, setTotalPrice] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    handler();
+  }, []);
+
+  async function handler(){
+    try{      
+      const checkResult = await checkSession(1);
+      if (checkResult) {
+        setIsLoading(false)
+      } else {
+        router.push("/")
+      }
+    } catch {
+      router.push("/")
+    }
+  }
 
   // Fungsi mengembalikan parameter-parameter ke nilai semula
   function clearStates() {
@@ -90,8 +108,7 @@ export default function Marketplace() {
       const txDraft = await txBuild
         .setNetwork("preprod")
         .txOut(contractAddress, assets)
-        .txOutDatumHashValue(mConStr0([signerHash,buyerHash,'Done']))
-        .txOutInlineDatumValue(mConStr0([signerHash,buyerHash,'Done']))
+        .txOutInlineDatumValue(mConStr0([signerHash,buyerHash,0]))
         .changeAddress(walletAddress)
         .selectUtxosFrom(utxos)
         .complete();
@@ -124,12 +141,15 @@ export default function Marketplace() {
     setView(2);
   }
 
+  if (isLoading) {
+    return <h1 className="flex justify-center items-center h-screen text-2xl">Checking session...</h1>;
+  }
+
   return (
     <div className="flex-col justify-center items-center text-white">
       {/* NAVBAR */}
       <div className="bg-gray-900 flex justify-between items-center p-6 border-b border-white mb-20">
         <h1 className="text-4xl font-bold">MARKETPLACE</h1>
-        <CardanoWallet />
       </div>
 
       {connected && view === 1 && (
