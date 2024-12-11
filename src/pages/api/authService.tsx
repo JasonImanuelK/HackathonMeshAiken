@@ -17,7 +17,7 @@ try {
 }
 };
 
-export async function addCookies(walletAddress: string, status: string): Promise<void> {
+export async function addCookies(walletAddress: string, status: string): Promise<boolean> {
     try {
         let rank = 0;
         if (status == "Platinum Member"){
@@ -42,12 +42,14 @@ export async function addCookies(walletAddress: string, status: string): Promise
 
         const data = await response.json();
         console.log('Login successful:', data);
+        return true;
     } catch (error) {
         console.error('Error during login:', error);
     }
+    return false;
 }
 
-export async function checkSession(rank: number): Promise<boolean> {
+export async function checkSession(walletAddress: string, rank: number): Promise<boolean> {
     try {
         const response = await fetch('/api/auth', {
         method: 'GET',
@@ -57,7 +59,7 @@ export async function checkSession(rank: number): Promise<boolean> {
         if (response.ok) {
             const data = await response.json();
             console.log('Session verified:', data);
-            if (data.wallet?.status >= rank){
+            if (data.wallet?.status >= rank && data.wallet?.address == walletAddress){
                 return true;
             }
             } else {

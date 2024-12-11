@@ -17,6 +17,7 @@ import { checkSession } from "../api/authService";
 
 // Integrasi smart-contract
 import contractBlueprint from "../../../aiken-workspace/plutus.json";
+import { notifyError } from "@/utils/notifications";
 
 // Mendapatkan validator script dalam format CBOR
 const scriptCbor = applyParamsToScript(
@@ -55,18 +56,21 @@ export default function Marketplace() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    handler();
+    sessionHandler();
   }, []);
 
-  async function handler(){
+  async function sessionHandler(){
     try{      
-      const checkResult = await checkSession(1);
+      const walletAddress = await wallet.getChangeAddress()
+      const checkResult = await checkSession(walletAddress, 1);
       if (checkResult) {
         setIsLoading(false)
       } else {
+        notifyError("You don't permission to be here. Maybe upgrade your membership ?")
         router.push("/")
       }
     } catch {
+      notifyError("You don't permission to be here. Sign in first !")
       router.push("/")
     }
   }
