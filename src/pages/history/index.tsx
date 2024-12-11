@@ -23,6 +23,7 @@ import { useRouter } from "next/router";
 import { checkSession } from "../api/authService";
 
 import contractBlueprint from "../../../aiken-workspace/plutus.json";
+import { notifyError } from "@/utils/notifications";
 
 export type MarketDatum = ConStr0<
   [PubKeyHash, PubKeyHash, Integer]
@@ -67,13 +68,16 @@ export default function Merchant() {
 
   async function sessionHandler(){
     try{      
-      const checkResult = await checkSession(2);
+      const walletAddress = await wallet.getChangeAddress()
+      const checkResult = await checkSession(walletAddress, 2);
       if (checkResult) {
         setIsLoading(false)
       } else {
+        notifyError("You don't permission to be here. Maybe upgrade your membership ?")
         router.push("/")
       }
     } catch {
+      notifyError("You don't permission to be here. Sign in first !")
       router.push("/")
     }
   }

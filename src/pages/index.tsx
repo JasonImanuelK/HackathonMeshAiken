@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { addCookies, deleteCookies } from './api/authService';
+import { addCookies, checkSession, deleteCookies } from './api/authService';
 import { useWallet } from "@meshsdk/react";
+import { notifySuccess, notifyWarning, notifyError } from "@/utils/notifications";
 
 export default function Home() {
   const { connected, wallet, disconnect } = useWallet();
@@ -22,9 +23,10 @@ export default function Home() {
       disconnect();
       deleteCookies();
       setSessionState(false);
-      console.log("Wallet disconnected successfully.");
+      console.log("Session : ",session)
+      notifySuccess("Sign Out Successful.")
     } catch (error: unknown) {
-      console.log("Sign Out Failed.");
+      notifyError("Sign Out Failed.");
     }
   }
 
@@ -42,6 +44,7 @@ export default function Home() {
       );
 
       if (filteredAsset.length === 0) {
+        notifyWarning("You don't have any of the required assets.");
         return;
       }
       else {
@@ -68,11 +71,21 @@ export default function Home() {
         }
         
         if (membershipType) {
-          addCookies(walletAdd, membershipType);
-          setSessionState(true);
-        } else {
-          console.log('No matching asset name found.');
-        }
+          const walletAddress = await wallet.getChangeAddress()
+          const checkResult = await checkSession(walletAddress, 1);
+          if (!checkResult) {
+            const checkLogin = await addCookies(walletAdd, membershipType);
+            setSessionState(true);
+
+            if (checkLogin){
+              notifySuccess("Sign In Successful.");
+            } else {
+              notifyError("Sign In Failed.");
+            }
+          } else {
+            setSessionState(true);
+          }     
+        } 
       }
     } catch (error) {
       console.error("Error fetching assets:", error)
@@ -87,10 +100,10 @@ export default function Home() {
         {session && (
           <button onClick={handleSignOut}
             className="bg-yellow-500 py-1 rounded-xl w-full text-indigo-900 font-semibold hover:font-bold hover:bg-yellow-400">
-            Log Out
+            Sign Out
           </button>
         )}
       </div>
-    </div>
+    </div>    
   );
 }

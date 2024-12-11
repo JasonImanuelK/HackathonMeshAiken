@@ -21,6 +21,7 @@ import { checkSession } from "../api/authService";
 
 // Integrasi smart-contract
 import contractBlueprint from "../../../aiken-workspace/plutus.json";
+import { notifyError } from "@/utils/notifications";
 
 export type MarketDatum = ConStr0<
   [PubKeyHash, PubKeyHash, Integer]
@@ -61,29 +62,30 @@ export default function Merchant() {
   const [utxoList, setUtxoList] = useState<UTxO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Ketika terdeksi perubahan parameter connected yang bernilai false menjadi true maka fungsi getUtxosListContractAddr() dieksekusi
   useEffect(() => {
     setUtxoList([]);
-    handler();
+    sessionHandler();
     if (connected) {
       getUtxosListContractAddr();
     }
   }, [connected]);
 
-  async function handler(){
+  async function sessionHandler(){
     try{      
-      const checkResult = await checkSession(3);
+      const walletAddress = await wallet.getChangeAddress()
+      const checkResult = await checkSession(walletAddress, 3);
       if (checkResult) {
         setIsLoading(false)
       } else {
+        notifyError("You don't permission to be here. Maybe upgrade your membership ?")
         router.push("/")
       }
     } catch {
+      notifyError("You don't permission to be here. Sign in first !")
       router.push("/")
     }
   }
 
-  // Fungsi untuk mendapatkan list UTxO dari contract address
   async function getUtxosListContractAddr() {
     const utxos: UTxO[] = await nodeProvider.fetchAddressUTxOs(contractAddress);
     
