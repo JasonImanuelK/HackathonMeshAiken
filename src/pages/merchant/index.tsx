@@ -2,58 +2,16 @@
 import { useState, useEffect } from "react";
 import { useWallet } from "@meshsdk/react";
 import {
-  BlockfrostProvider,
   UTxO,
-  deserializeAddress,
-  deserializeDatum,
-  serializePlutusScript,
-  mConStr0,
-  ConStr0,
-  stringToHex,
-  MeshTxBuilder,
   Asset,
-  PubKeyHash,
-  Integer,
 } from "@meshsdk/core";
-import { applyParamsToScript } from "@meshsdk/core-csl";
 import { useRouter } from "next/router";
 import { checkSession } from "../api/authService";
 
-// Integrasi smart-contract
-import contractBlueprint from "../../../aiken-workspace/plutus.json";
-import { notifyError } from "@/utils/notifications";
+import { notifySuccess,notifyError } from "@/utils/notifications";
+import { getUtxosListContractAddr, withdraw } from "../offchain";
 
-export type MarketDatum = ConStr0<
-  [PubKeyHash, PubKeyHash, Integer]
->;
-
-// Mendapatkan validator script dalam format CBOR
-const scriptCbor = applyParamsToScript(
-  contractBlueprint.validators[0].compiledCode,
-  []
-);
-
-// Mendapatkan contract address
-const contractAddress = serializePlutusScript(
-  { code: scriptCbor, version: "V3" },
-  undefined,
-  0
-).address;
-
-// Loading environment variable blockfrost API key dan seedphrares wallet
-const blockfrostApiKey = process.env.NEXT_PUBLIC_BLOCKFROST_API_KEY || "";
-
-// Inisiasi node provider Blockfrost
-const nodeProvider = new BlockfrostProvider(blockfrostApiKey);
-
-// Reference number sebagai Redeemer
-const refNumber = "17925";
-
-// Jeda 10 detik setelah berhasil transaksi
-const timeout = 30000;
-
-const merchantAddress = process.env.NEXT_PUBLIC_SELLER_ADDRESS || "";
-const signerHash = deserializeAddress(merchantAddress).pubKeyHash;
+const timeout = 10000;
 
 export default function Merchant() {
   const router = useRouter();
@@ -63,10 +21,11 @@ export default function Merchant() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setUtxoList([]);
     sessionHandler();
     if (connected) {
-      getUtxosListContractAddr();
+      callUtxos(false);
+    } else {
+      setUtxoList([])
     }
   }, [connected]);
 
@@ -77,42 +36,13 @@ export default function Merchant() {
       if (checkResult) {
         setIsLoading(false)
       } else {
-        notifyError("You don't permission to be here. Maybe upgrade your membership ?")
+        notifyError("You don't have permission to be here. Maybe upgrade your membership ?")
         router.push("/")
       }
     } catch {
-      notifyError("You don't permission to be here. Sign in first !")
+      notifyError("You don't have permission to be here. Sign in first !")
       router.push("/")
     }
-  }
-
-  async function getUtxosListContractAddr() {
-    const utxos: UTxO[] = await nodeProvider.fetchAddressUTxOs(contractAddress);
-    
-    const newUtxos: UTxO[] = [];
-    utxos.slice(2).forEach((utxo) => {
-      console.log("UTxO:", utxo);
-      if (utxo.output.plutusData !== undefined) {
-        const datum = deserializeDatum<MarketDatum>(utxo.output.plutusData!);
-        console.log("Datum INSIDE :",datum)
-        if (datum.fields[0].bytes === signerHash) {
-          newUtxos.push(utxo);
-        }
-      } else {
-        console.log("plutusData is undefined");
-        newUtxos.push(utxo);
-      } 
-    });
-
-    setUtxoList(newUtxos);
-  }
-
-  // Fungsi membaca informasi wallet
-  async function getWalletInfo() {
-    const walletAddress = await wallet.getChangeAddress();
-    const utxos = await wallet.getUtxos();
-    const collateral = (await wallet.getCollateral())[0];
-    return { walletAddress, utxos, collateral };
   }
 
   async function handleTx(
@@ -122,58 +52,32 @@ export default function Merchant() {
     address: string
   ) {
     try {
-      // Mendapatkan alamat wallet, list utxo, dan kolateral dari wallet address penerima dana
-      const { walletAddress, utxos, collateral } = await getWalletInfo();
+      setLoading(false);
+      const res = await withdraw(txHash, index, amount, address, wallet)
 
-      // Membuat draft transaksi
-      const txBuild = new MeshTxBuilder({
-        fetcher: nodeProvider,
-        evaluator: nodeProvider,
-        verbose: true,
-      });
-      const txDraft = await txBuild
-        .setNetwork("preprod")
-        .spendingPlutusScript("V3")
-        .txIn(txHash, index, amount, address)
-        .txInScript(scriptCbor)
-        .txInRedeemerValue(mConStr0([stringToHex(refNumber)]))
-        .txInDatumValue(mConStr0([signerHash]))
-        .requiredSignerHash(signerHash)
-        .changeAddress(walletAddress)
-        .txInCollateral(
-          collateral.input.txHash,
-          collateral.input.outputIndex,
-          collateral.output.amount,
-          collateral.output.address
-        )
-        .selectUtxosFrom(utxos)
-        .complete();
-
-      // Menandatangani transaksi
-      let signedTx;
-      try {
-        signedTx = await wallet.signTx(txDraft);
-      } catch (error) {
+      if (res) {
+        setTimeout(() => {
+          alert(`Transaction successful`);
+          getUtxosListContractAddr(wallet,'owner');
+          setLoading(true);
+        }, timeout);
+        return;
+      } else {
+        setLoading(true);
+        alert(`Transaction failed`);
         return;
       }
-
-      // Submit transaksi dan mendapatkan transaksi hash
-      const txHash_ = await wallet.submitTx(signedTx);
-      setLoading(false);
-      setUtxoList([]);
-
-      // Jeda, setelah berhasil transaksi lalu muat ulang list UTxO dari contract address
-      setTimeout(() => {
-        alert(`Transaction successful : ${txHash_}`);
-        getUtxosListContractAddr();
-        setLoading(true);
-      }, timeout);
-
-      return;
     } catch (error) {
-      // Error handling jika transaksi gagal
-      alert(`Transaction failed ${error}`);
+      setLoading(true);
+      alert(`Transaction failed`);
       return;
+    }
+  }
+
+  async function callUtxos(notif: boolean){
+    setUtxoList(await getUtxosListContractAddr(wallet,'buyer'));
+    if (notif){
+      notifySuccess("Refreshed");
     }
   }
 
@@ -186,6 +90,12 @@ export default function Merchant() {
       {/* NAVBAR */}
       <div className="bg-gray-900 flex justify-between items-center p-6 border-b border-white text-white mb-24">
         <h1 className="text-4xl font-bold">MERCHANT PAYOUT</h1>
+        <button
+          className="bg-blue-500 hover:bg-blue-700 text-white text-sm font-bold py-2 px-4 rounded"
+          onClick={() => callUtxos(true)}
+        >
+          Refresh
+        </button>
       </div>
 
       {/* TABLE */}
