@@ -3,7 +3,7 @@ use aiken/crypto.{VerificationKeyHash}
 pub type Datum {
   owner: VerificationKeyHash,
   buyer: VerificationKeyHash,
-  status: ByteArray,
+  status: Int,
 }
 
 pub type Redeemer {

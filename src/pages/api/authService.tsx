@@ -49,7 +49,7 @@ export async function addCookies(walletAddress: string, status: string): Promise
     return false;
 }
 
-export async function checkSession(walletAddress: string, rank: number): Promise<boolean> {
+export async function checkSession(walletAddress: string, rank: number) {
     try {
         const response = await fetch('/api/auth', {
         method: 'GET',
@@ -60,7 +60,7 @@ export async function checkSession(walletAddress: string, rank: number): Promise
             const data = await response.json();
             console.log('Session verified:', data);
             if (data.wallet?.status >= rank && data.wallet?.address == walletAddress){
-                return true;
+                return data.wallet?.status;
             }
             } else {
                 const errorData = await response.json();

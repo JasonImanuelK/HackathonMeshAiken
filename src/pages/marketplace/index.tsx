@@ -2,47 +2,11 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useWallet } from "@meshsdk/react";
-import {
-  BlockfrostProvider,
-  deserializeAddress,
-  serializePlutusScript,
-  mConStr0,
-  MeshTxBuilder,
-  Asset,
-  Data
-} from "@meshsdk/core";
-import { applyParamsToScript } from "@meshsdk/core-csl";
 import { useRouter } from "next/router";
 import { checkSession } from "../api/authService";
-
-// Integrasi smart-contract
-import contractBlueprint from "../../../aiken-workspace/plutus.json";
 import { notifyError } from "@/utils/notifications";
+import { purchase } from "../offchain";
 
-// Mendapatkan validator script dalam format CBOR
-const scriptCbor = applyParamsToScript(
-  contractBlueprint.validators[0].compiledCode,
-  []
-);
-
-// Mendapatkan contract address
-const contractAddress = serializePlutusScript(
-  { code: scriptCbor, version: "V3" },
-  undefined,
-  0
-).address;
-
-// Loading environment variable blockfrost API key
-const blockfrostApiKey = process.env.NEXT_PUBLIC_BLOCKFROST_API_KEY || "";
-const merchantAddress = process.env.NEXT_PUBLIC_SELLER_ADDRESS || "";
-
-// Inisialisasi node provider Blockfrost
-const nodeProvider = new BlockfrostProvider(blockfrostApiKey);
-
-// Mendapatkan pubKeyHash dari wallet address merchant
-const signerHash = deserializeAddress(merchantAddress).pubKeyHash;
-
-// Menentukan harga produk dan fee
 const price = 10;
 const platformFee = 1;
 const deliveryFee = 3;
@@ -54,95 +18,65 @@ export default function Marketplace() {
   const [quantity, setQuantity] = useState(1);
   const [totalPrice, setTotalPrice] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [rank, setRank] = useState(0);
 
   useEffect(() => {
     sessionHandler();
-  }, []);
+  }, [connected]);
 
   async function sessionHandler(){
     try{      
       const walletAddress = await wallet.getChangeAddress()
       const checkResult = await checkSession(walletAddress, 1);
       if (checkResult) {
+        setRank(checkResult)
         setIsLoading(false)
       } else {
-        notifyError("You don't permission to be here. Maybe upgrade your membership ?")
+        notifyError("You don't have permission to be here. Maybe upgrade your membership ?")
         router.push("/")
       }
     } catch {
-      notifyError("You don't permission to be here. Sign in first !")
+      notifyError("You don't have permission to be here. Sign in first !")
       router.push("/")
     }
   }
 
-  // Fungsi mengembalikan parameter-parameter ke nilai semula
   function clearStates() {
     setView(1);
     setQuantity(1);
     setTotalPrice(0);
   }
 
-  // Fungsi membaca informasi wallet
-  async function getWalletInfo() {
-    const walletAddress = await wallet.getChangeAddress();
-    const utxos = await wallet.getUtxos();
-    return { walletAddress, utxos };
-  }
-
   async function txHandler() {
     try {
-      // Menghitung total harga
       const totalPrice = price * quantity + platformFee + deliveryFee;
 
-      // Menentukan jumlah aset yang akan di kunci
-      const lovelaceAmount = (totalPrice * 1000000).toString();
-      const assets: Asset[] = [{ unit: "lovelace", quantity: lovelaceAmount }];
+      const res = await purchase(totalPrice,wallet);
 
-      // Mendapatkan wallet address dan index utxo
-      const { walletAddress, utxos } = await getWalletInfo();
-
-      const buyerHash = deserializeAddress(walletAddress).pubKeyHash;
-
-      // Membuat draft transaksi
-      const txBuild = new MeshTxBuilder({
-        fetcher: nodeProvider,
-        evaluator: nodeProvider,
-        verbose: true,
-      });
-      const txDraft = await txBuild
-        .setNetwork("preprod")
-        .txOut(contractAddress, assets)
-        .txOutInlineDatumValue(mConStr0([signerHash,buyerHash,0]))
-        .changeAddress(walletAddress)
-        .selectUtxosFrom(utxos)
-        .complete();
-
-      // Menandatangani transaksi
-      let signedTx;
-      try {
-        signedTx = await wallet.signTx(txDraft);
-      } catch (error) {
+      if (res){
+        alert(`Transaction successful`);
+        clearStates();
         return;
+      } else{
+        alert(`Transaction failed`);
+        clearStates();
       }
-
-      // Submit transaksi dan mendapatkan transaksi hash
-      const txHash_ = await wallet.submitTx(signedTx);
-      alert(`Transaction successful : ${txHash_}`);
-      clearStates();
-      return;
     } catch (error) {
-      // Error handling jika transaksi gagal
-      alert(`Transaction failed ${error}`);
+      alert(`Transaction failed`);
       clearStates();
       return;
     }
   }
 
-  // Fungsi untuk menghitung harga total
   function checkoutHandler() {
-    const total = price * quantity + platformFee + deliveryFee;
-    setTotalPrice(total);
-    setView(2);
+    if(rank > 1){
+      const total = price * quantity + platformFee + deliveryFee;
+      setTotalPrice(total);
+      setView(2);
+    } else {
+      notifyError("You don't have permission to buy. Upgrade your membership !")
+    }
+    
   }
 
   if (isLoading) {
