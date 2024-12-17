@@ -67,6 +67,8 @@ This project is a **Marketplace DApps** running on the **Cardano Server**, using
   - Easier navigation between pages.
 - **Refresh Button**:
   - Allows users to load new transactions without refreshing the entire page.
+- **Modularity**:
+  - Grouping auth and service on api, utilizations, and smart contract script and transaction builder in their own folder, to reduce redundancy and improve maintainability.    
 
 ---
 
