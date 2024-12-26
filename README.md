@@ -78,10 +78,10 @@ This project is a **Marketplace DApps** running on the **Cardano Server**, using
   [GitHub](https://github.com/JasonImanuelK) | [LinkedIn](https://linkedin.com/in/jason-kasman)
 
 - **Frederick**  
-  [GitHub](https://github.com/frederick) | [LinkedIn](https://linkedin.com/in/frederick)
+  [GitHub](https://github.com/HYL-TX) | [LinkedIn](https://www.linkedin.com/in/frederick-halim)
 
 ---
 
 ## 📬 Contact
-For questions or feedback, reach out to [jasonkasman@gmail.com] or [].
+For questions or feedback, reach out to [jasonkasman@gmail.com] or [frederick.halim96@gmail.com].
 
