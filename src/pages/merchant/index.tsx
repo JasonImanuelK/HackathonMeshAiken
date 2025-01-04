@@ -75,7 +75,7 @@ export default function Merchant() {
   }
 
   async function callUtxos(notif: boolean){
-    setUtxoList(await getUtxosListContractAddr(wallet,'buyer'));
+    setUtxoList(await getUtxosListContractAddr(wallet,'owner'));
     if (notif){
       notifySuccess("Refreshed");
     }
